@@ -1,13 +1,16 @@
 import asyncio
 import time
+import requests
 from contextlib import asynccontextmanager
 from typing import Iterator
 
 import anyio
 from fastapi import FastAPI, WebSocket
+import httpx
 from starlette.responses import HTMLResponse
 from starlette.websockets import WebSocketDisconnect
 
+from shared.message_broker import message_broker
 from shared.chat import html
 
 # from shared.message_broker import message_broker
@@ -23,7 +26,10 @@ async def lifespan(app: FastAPI) -> Iterator[None]:
     yield
 
 
-app = FastAPI(title="FastAPI Async", lifespan=lifespan)
+app = FastAPI(title="FastAPI Async")
+
+# 쓰레드의 수를 임의적으로 늘린 lifespan을 적용!
+# app = FastAPI(title="FastAPI Async", lifespan=lifespan)
 app.include_router(router=user_sync_router, prefix="/sync")
 app.include_router(router=user_async_router, prefix="/async")
 
@@ -39,8 +45,8 @@ async def websocket_handler(websocket: WebSocket, client_id: int):
     try:
         while True:
             message = await websocket.receive_text()
-            await ws_manager.broadcast(sender_client_id=client_id, message=message)
-            # await message_broker.publish(client_id=client_id, message=message)
+            # await ws_manager.broadcast(sender_client_id=client_id, message=message)
+            await message_broker.publish(client_id=client_id, message=message)
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket, client_id)
 
@@ -55,3 +61,59 @@ def get_sleep_handler():
 async def get_async_sleep_handler():
     await asyncio.sleep(1)
     return True
+
+# # 동기방식의 단일 API 호출
+# @app.get("/sync/posts")
+# def get_posts_sync_handler():
+#     response = requests.get(
+#         'https://jsonplaceholder.typicode.com/posts'
+#     )
+#     response.raise_for_status()
+#     return response.json()
+
+# # 비동기방식의 단일 API 호출
+# @app.get('/async/posts')
+# async def get_posts_async_handler():
+#     async with httpx.AsyncClient() as client:
+#         response = await client.get(
+#             'https://jsonplaceholder.typicode.com/posts'
+#         )
+#         response.raise_for_status()
+#         return response.json()
+
+
+# 동기 방식의 다중 API 호출
+@app.get('/sync/posts')
+def get_posts_sync_handler():
+    start_time = time.perf_counter()
+
+    urls = [
+        "https://jsonplaceholder.typicode.com/posts",
+        "https://jsonplaceholder.typicode.com/posts",
+        "https://jsonplaceholder.typicode.com/posts",
+    ]
+    responses = []
+    for url in urls:
+        responses.append(requests.get(url))
+
+    end_time = time.perf_counter()
+    return {"duration": end_time - start_time}
+
+
+# 비동기 방식의 다중 API 호출
+@app.get('/async/posts')
+async def get_posts_async_handler():
+    start_time = time.perf_counter()
+
+    urls = [
+        "https://jsonplaceholder.typicode.com/posts",
+        "https://jsonplaceholder.typicode.com/posts",
+        "https://jsonplaceholder.typicode.com/posts"
+    ]
+
+    async with httpx.AsyncClient() as client:
+        tasks = [client.get(url) for url in urls]
+        await asyncio.gather(*tasks)
+
+    end_time = time.perf_counter()
+    return {"duration": end_time - start_time}

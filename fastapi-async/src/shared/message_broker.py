@@ -44,4 +44,4 @@ class MessageBroker:
                 await ws_manager.broadcast(sender_client_id=payload["client_id"], message=payload["message"])
 
 
-# message_broker = MessageBroker.init()
+message_broker = MessageBroker.init()

@@ -22,7 +22,7 @@ class UserRepository:
 
     async def get_user_by_username(self, username: str) -> User | None:
         result = await self.db.execute(
-            select(User).where(User.name == username)
+            select(User).where(User.username == username)
         )
         return result.scalars().first()
 
