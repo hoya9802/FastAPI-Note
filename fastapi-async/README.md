@@ -44,3 +44,7 @@ pytest
    - wrk -c 100 -d 10 http://127.0.0.1:8000/sync/sleep
 4. ASync / 100 Connections / 10s
    - wrk -c 100 -d 10 http://127.0.0.1:8000/async/sleep
+ * If the above command doesn't work, try running it using Docker:
+```shell
+docker run --rm williamyeh/wrk -c 10 -d 10 http://host.docker.internal:8000/sync/sleep
+```
